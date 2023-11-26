@@ -1,229 +1,7 @@
-
-terraform {
-  required_providers {
-    aws = {
-        source = "hashicorp/aws"
-        version = "~> 4.0.0"
-    }
-  }
-}
-
-// configurações da aws
 provider "aws" {
-    region = var.aws_region
+  region = "us-east-1"  # Substitua pela sua região desejada
 }
 
-data "aws_availability_zones" "available"{
-    state = "available"
-}
-
-// TALVEZ DEPOIS DAQUI DE PRA SEPARAR EM MODULOS
-// configurações da vpc
-resource "aws_vpc" "tutorial_vpc" {
-    // Setando cidr para o vpc
-    cidr_block          = var.vpc_cidr_block
-    // vamos habilitar o DNS 
-    enable_dns_hostnames = true 
-    // colocando a tag para vpc
-    tags = {
-      Name = "tutorial_vpc"
-    } 
-}
-// Criando o gateway 
-
-resource "aws_internet_gateway" "net_gateway" {
-    // pegando o id do vpc 
-    vpc_id = aws_vpc.tutorial_vpc.id
-
-    tags = {
-      Name = "net_gateway"
-    }
-}
-
-// Criando As subnets 
-
-resource "aws_subnet" "publics_subsnets" {
-    // número de subnets públicas
-    count       = var.subnet_count.public
-    // colocando a subnets na VPC
-    vpc_id      = aws_vpc.tutorial_vpc.id
-  
-    // associando a um CIDR 
-    cidr_block = var.public_subnet_cidr_blocks[count.index]
-    
-    // Pegando as zonas de disponibilidade
-    availability_zone = data.aws_availability_zones.available.names[count.index]
-
-    tags = {
-        Name = "subnet_publica_${count.index}"
-    }
-}
-
-resource "aws_subnet" "privadas_subnets" {
-    // número de subnets públicas
-    count       = var.subnet_count.private
-    // colocando a subnets na VPC
-    vpc_id      = aws_vpc.tutorial_vpc.id
-  
-    // associando a um CIDR 
-    cidr_block = var.private_subnet_cidr_blocks[count.index]
-    
-    // Pegando as zonas de disponibilidade
-    availability_zone = data.aws_availability_zones.available.names[count.index]
-
-    tags = {
-        Name = "subnet_privada_${count.index}"
-    }
-}
-
-
-// Criando as Tabelas de Rotas (Route Tables)
-
-// Criando a route table publica
-
-resource "aws_route_table" "tabela_publica" {
-    vpc_id = aws_vpc.tutorial_vpc.id
-  
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.net_gateway.id
-    }
-}
-
-resource "aws_route_table_association" "public" {
-
-    count           = var.subnet_count.public
-
-    route_table_id  = aws_route_table.tabela_publica.id  
-    subnet_id       = aws_subnet.publics_subsnets[count.index].id
-  
-}
-
-// Criando a route table privada
-
-resource "aws_route_table" "tabela_privada" {
-    vpc_id = aws_vpc.tutorial_vpc.id
-}
-
-resource "aws_route_table_association" "private" {
-
-    count               = var.subnet_count.private
-
-    route_table_id      = aws_route_table.tabela_privada.id
-
-    subnet_id           = aws_subnet.privadas_subnets[count.index].id  
-}
-
-// Crianção dos Security Groups 
-
-resource "aws_security_group" "tutorial_web_sg" {
-
-    name        = "tutortial_web_sg"
-    description = "Security group para web servers"
-    vpc_id      = aws_vpc.tutorial_vpc.id 
-
-    ingress {
-        description = " permitir o trafico http"
-        from_port   = "80"
-        to_port     = "80"
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"] 
-    } 
-
-    ingress {
-        description = " permitindo ssh com computador"
-        from_port   = "22"
-        to_port     = "22"
-        protocol    = "tcp"
-        // aqui vamos usar o nosso ip 
-        cidr_blocks = ["${var.my_ip}/32"] 
-    }
-
-    egress {
-        description = "Permitindo a saida"
-        from_port   = 0 
-        to_port     = 0
-        protocol    = "-1"
-        cidr_blocks = ["0.0.0.0/0"]  
-    }
-
-    tags = {
-      Name = "tutotial_web_sg"
-    } 
-}
-
-// Criando os Security Group para o rds
-
-resource "aws_security_group" "tutorial_db_sg" {
-
-    name        = "tutorial_db_sg"
-    description = "Security Group para a database"
-
-    vpc_id      = aws_vpc.tutorial_vpc.id 
-
-    ingress {
-        description     = "Permitir a conexao MySQL apenas com a instancia ec2"
-        from_port       = "3306"
-        to_port         = "3306"
-        protocol        = "tcp"
-        security_groups = [aws_security_group.tutorial_web_sg.id]  
-    } 
-
-    tags = {
-        Name = "tutorial_db_sg"
-    }
-  
-}
-
-// Criando um grupo de subnet para database
-resource "aws_db_subnet_group" "tutorial_db_subnet_group" {
-
-    name        = "tutorial_db_subnet_group"
-    description = "DB subnet group"
-
-    subnet_ids = [for subnets in aws_subnet.privadas_subnets : subnets.id]
-  
-}
-// Criando o MySQL RDS Database 
-
-resource "aws_db_instance" "tutorial_database" {
-    
-    allocated_storage   = var.settings.database.allocated_storage 
-
-    engine              = var.settings.database.engine
-
-    engine_version      = var.settings.database.engine_version
-
-    instance_class      = var.settings.database.instance_class
-
-    db_name             = var.settings.database.db_name
-
-    username            = var.db_username
-
-    password            = var.db_password
-
-    db_subnet_group_name = aws_db_subnet_group.tutorial_db_subnet_group.id 
-
-    vpc_security_group_ids = [aws_security_group.tutorial_db_sg.id]       
-    
-    skip_final_snapshot = 	var.settings.database.skip_final_snapshot
-}
-
-
-// se não tiver criar um par de chaves com o comando
-/*
-ssh-keygen -t rsa -b 4096 -m pem -f tutorial_kp && openssl rsa -in tutorial_kp -outform pem && chmod 400 tutorial_kp.pem
-
-*/
-
-
-resource "aws_key_pair" "tutorial_kp"{
-    key_name = "vamo_teste"
-
-    public_key = file("vamo_teste.pem.pub")
-}
-// Criando as instancias ec2 
-// Primeira buscando a ami da instancia
 data "aws_ami" "ubuntu"{
     most_recent = "true"
 
@@ -239,38 +17,209 @@ data "aws_ami" "ubuntu"{
 
     owners = ["099720109477"]
 }
-// Com a ami feita, agora podemos criar a instancia de fato
+# Criando o VPC 
+resource "aws_vpc" "VPC-oficial" {
+    // Setando cidr para o vpc
+    cidr_block          = var.vpc_cidr_block
+    // vamos habilitar o DNS 
+    enable_dns_hostnames = false
+    // colocando a tag para vpc
+    tags = {
+      Name = "VPC-oficial"
+    } 
+}
+# Criando Gateway
+resource "aws_internet_gateway" "internet-gateway-load-balancer" {
+    // pegando o id do vpc 
+    vpc_id = aws_vpc.VPC-oficial.id
 
-resource "aws_instance" "tutorial_web" {
+    tags = {
+      Name = "internet-gateway-load-balancer"
+    }
+}
+# configurar as SubNets
+data "aws_availability_zones" "available"{
+    state = "available"
+}
+# Criando as subnets
+resource "aws_subnet" "subnet-oficial" {
+    # número de subnets públicas
+    count       = 2
+    # colocando a subnets na VPC
+    vpc_id      = aws_vpc.VPC-oficial.id
+    // associando a um CIDR 
+    cidr_block = var.subnets[count.index]
 
-    count               = var.settings.web_app.count
+    map_public_ip_on_launch = true
+    
+    // Pegando as zonas de disponibilidade
+    availability_zone = data.aws_availability_zones.available.names[count.index]
 
-    ami                 = data.aws_ami.ubuntu.id 
+    tags = {
+        Name = "subnet-official-${count.index}"
+    }
+}
+# Criando a tabela de rotas
+resource "aws_route_table" "rota-load-official" {
+      vpc_id = aws_vpc.VPC-oficial.id
+      
+      route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.internet-gateway-load-balancer.id
+      }
 
-    instance_type       = var.settings.web_app.instance_type 
+  tags = {
+    Name = "rota-load-official"
+  }
+
+}
+# Associando as subnets na tabela de rotas
+resource "aws_route_table_association" "subnetAssociation" {
+
+    count           = 2
+
+    route_table_id  = aws_route_table.rota-load-official.id  
+    subnet_id       = aws_subnet.subnet-oficial[count.index].id
   
-    subnet_id = aws_subnet.publics_subsnets[count.index].id
+}
+# Criando o Security group
+resource "aws_security_group" "securityGroupLoad" {
+    name        = "securityGroupLoad"
+    description = "Security Group para a LoadBalancer"
 
-    key_name = aws_key_pair.tutorial_kp.key_name
+    vpc_id      = aws_vpc.VPC-oficial.id  # AJEITAR 
 
-    vpc_security_group_ids = [aws_security_group.tutorial_web_sg.id]
-
-    tags = {
-        Name = "tutorial_web_${count.index}"
+    ingress { # VERIFICAR TUDO ISSO
+        description     = "Permitindo o trafico http"
+        from_port       = "80"
+        to_port         = "80"
+        protocol        = "tcp"
+        cidr_blocks     = ["0.0.0.0/0"] 
     }
 
-}
-
-// Criando elastic IP para as instancias ec2 
-
-resource "aws_eip" "tutorial_web_eip" {
-
-    count = var.settings.web_app.count
-
-    instance = aws_instance.tutorial_web[count.index].id
-
-    tags = {
-      Name = "tutorial_web_eip_${count.index}"
+    ingress { 
+        description     = "Permitindo o conexao na porta 8080"
+        from_port       = "8080"
+        to_port         = "8080"
+        protocol        = "tcp"
+        cidr_blocks     = ["0.0.0.0/0"] 
     }
 
+    ingress { 
+        description     = "Permitindo o ssh com o computador"
+        from_port       = "22"
+        to_port         = "22"
+        protocol        = "tcp"
+        cidr_blocks     = ["0.0.0.0/0"] 
+    }
+
+    egress {
+        description = "Permitindo a saida"
+        from_port   = 0 
+        to_port     = 0
+        protocol    = "-1"
+        cidr_blocks = ["0.0.0.0/0"]  
+    }
+
+    tags = {
+        Name = "securityGroupLoad"
+    }
+  
 }
+# Criando um Target group
+resource "aws_lb_target_group" "novo-target" {
+  name        = "novo-target"
+  port        = 8080
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.VPC-oficial.id  
+
+  health_check {
+    path                = "/"
+    port                = 8080
+    protocol            = "HTTP"
+    interval            = 30
+    timeout             = 10
+    unhealthy_threshold = 2
+  }
+}
+# Criando um Load Balancer
+resource "aws_lb" "load-balancer" {
+  name               = "load-balancer"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.securityGroupLoad.id]  # Substitua pelo ID do seu Security Group
+  subnets            = aws_subnet.subnet-oficial[*].id      # Substitua pelo ID da sua Subnet
+
+  enable_deletion_protection         = false
+  enable_cross_zone_load_balancing   = true
+  enable_http2                      = true
+}
+# Associando o Target Group ao Load Balancer
+resource "aws_lb_listener" "example_listener" {
+  load_balancer_arn = aws_lb.load-balancer.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.novo-target.arn
+  }
+}
+
+
+resource "aws_instance" "load_balancer_off" {
+      # Números de Instâncias 
+      count     = 2
+      # Pegando a imagem que queremos
+      ami       = data.aws_ami.ubuntu.id
+      # Tipo da intancia
+      instance_type = "t2.micro" 
+      #
+      subnet_id = aws_subnet.subnet-oficial[count.index].id 
+
+      key_name = "proj_link"
+
+      vpc_security_group_ids = [ aws_security_group.securityGroupLoad.id ] 
+    # Rodar dentro da máquina
+    user_data = base64encode(<<-EOF
+              #!/bin/bash
+              sudo apt-get update
+              sudo apt-get install pip -y
+              pip install flask
+              cd /home/ubuntu
+              git clone https://github.com/LinkolnR/api_p_cloud_testes
+              cd api_p_cloud_testes/
+              python3 app.py
+              EOF
+              )
+
+
+    tags = {
+        Name = "load_balancer_off_${count.index}"
+    }
+}
+
+
+resource "aws_lb_target_group_attachment" "example_target_group_attachment" {
+  count           = length(aws_instance.load_balancer_off)
+  target_group_arn = aws_lb_target_group.novo-target.arn
+  target_id       = aws_instance.load_balancer_off[count.index].id
+}
+
+
+
+
+
+
+// configurações da vpc
+
+
+
+
+
+
+
+
+
+
+
