@@ -2,6 +2,18 @@ provider "aws" {
   region = "us-east-1"  # Substitua pela sua região desejada
 }
 
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0.0"
+    }
+  }
+  required_version = ">= 1.6.0"
+}
+
+
+
 data "aws_ami" "ubuntu"{
     most_recent = "true"
 
@@ -59,6 +71,24 @@ resource "aws_subnet" "subnet-oficial" {
         Name = "subnet-official-${count.index}"
     }
 }
+# Criando mais uma subnet pora o RDS 
+resource "aws_subnet" "subnet-rds" {
+    # colocando a subnets na VPC
+    vpc_id      = aws_vpc.VPC-oficial.id
+    // associando a um CIDR 
+    cidr_block = var.subnets[3]
+
+    map_public_ip_on_launch = true
+    
+    // Pegando as zonas de disponibilidade
+    availability_zone = data.aws_availability_zones.available.names[3]
+
+    tags = {
+        Name = "subnet-rds"
+    }
+}
+
+
 # Criando a tabela de rotas
 resource "aws_route_table" "rota-load-official" {
       vpc_id = aws_vpc.VPC-oficial.id
@@ -206,20 +236,49 @@ resource "aws_lb_target_group_attachment" "example_target_group_attachment" {
   target_id       = aws_instance.load_balancer_off[count.index].id
 }
 
+# Criação do Security Group no RDS
+resource "aws_db_instance" "database" {
+  allocated_storage     = 20
+  storage_type          = "gp2"
+  engine                = "mysql"
+  engine_version        = "5.7"
+  instance_class        = "db.t2.micro"
+  
+  username              =  var.db_username
+  password              =  var.db_password
+  
+  parameter_group_name  = "default.mysql5.7"
+  vpc_security_group_ids = [aws_security_group.rds.id]
+
+  db_subnet_group_name    = aws_db_subnet_group.subnet_group_new_vpc.name
+  
+  identifier            = "instancia-database-rds"
+  publicly_accessible   = false
+  skip_final_snapshot   = true
+  multi_az              = true 
 
 
+  tags = {
+    Name = "database aplicacao"
+  }
+}
 
 
+# Subnet Group para a nova VPC
+resource "aws_db_subnet_group" "subnet_group_new_vpc" {
+  name       = "db-subnet-group-new-vpc"
+  subnet_ids = [aws_subnet.subnet-oficial[0].id,aws_subnet.subnet-oficial[1].id ,aws_subnet.subnet-rds.id] # Substitua pelos IDs das subnets da nova VPC
+}
 
-// configurações da vpc
+# data "aws_secretsmanager_secret" "db_credentials" {
+#   name = "app/mysql/credentials"
+# }
 
+# data "aws_secretsmanager_secret_version" "current" {
+#   secret_id = data.aws_secretsmanager_secret.db_credentials.id
+# }
 
-
-
-
-
-
-
-
-
+# locals {
+#   db_credentials = jsondecode(data.aws_secretsmanager_secret_version.current.secret_string)
+# }
 
