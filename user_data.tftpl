@@ -1,0 +1,14 @@
+#!/bin/bash
+sudo apt-get update
+sudo apt-get install pip -y
+cd /home/ubuntu
+git clone https://github.com/LinkolnR/ApiRestFull-borafit.git
+cd ApiRestFull-borafit/
+pip install -r requirements.txt
+echo DB_HOST=${db_host} > .env
+echo DB_PORT=${db_port} >> .env
+echo DB_NAME=${db_name} >> .env
+echo DB_USER=${db_user} >> .env
+echo DB_PASSWORD=${db_password} >> .env
+cd projeto/
+python main.py

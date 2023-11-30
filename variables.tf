@@ -9,7 +9,7 @@ variable "vpc_cidr_block" {
     default = "10.0.0.0/20"
 }
 # Definindo as subnets
-variable "subnets" {
+variable "subnets_publicas" {
     description = "Definindo as subnets para as instancias"
     type        = list(string)
     default = [ 
@@ -17,6 +17,18 @@ variable "subnets" {
         "10.0.1.0/24",
         "10.0.2.0/24",
         "10.0.3.0/24"
+     ]
+}
+
+
+variable "subnets_privadas" {
+    description = "Definindo as subnets para as instancias"
+    type        = list(string)
+    default = [ 
+        "10.0.100.0/24",
+        "10.0.101.0/24",
+        "10.0.102.0/24",
+        "10.0.103.0/24"
      ]
 }
 
