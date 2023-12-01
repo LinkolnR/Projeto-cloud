@@ -42,3 +42,8 @@ dimensions = {
 alarm_description = "This metric monitor EC2 instance CPU utilization"
   alarm_actions = [ aws_autoscaling_policy.web_policy_down.arn ]
 }
+
+
+resource "aws_cloudwatch_log_group" "my_log_group" {
+  name = "/fast-api/logs"
+}
