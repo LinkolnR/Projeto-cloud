@@ -16,7 +16,3 @@ resource "aws_autoscaling_group" "web" {
     propagate_at_launch = true
   }
 }
-# resource "aws_autoscaling_attachment" "asg_attach" {
-#   autoscaling_group_name = aws_autoscaling_group.web.name
-#   lb_target_group_arn  = aws_lb_target_group.novo-target.arn
-# }

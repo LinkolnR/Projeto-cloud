@@ -2,7 +2,7 @@ resource "aws_autoscaling_policy" "web_policy_up" {
   name = "web_policy_up"
   scaling_adjustment = 1
   adjustment_type = "ChangeInCapacity"
-  cooldown = 300
+  cooldown = 40
   autoscaling_group_name = aws_autoscaling_group.web.name
 }
 resource "aws_cloudwatch_metric_alarm" "web_cpu_alarm_up" {
@@ -14,11 +14,11 @@ resource "aws_cloudwatch_metric_alarm" "web_cpu_alarm_up" {
   period = "120"
   statistic = "Average"
   threshold = "70"
-dimensions = {
-    AutoScalingGroupName = aws_autoscaling_group.web.name
-  }
-alarm_description = "This metric monitor EC2 instance CPU utilization"
-  alarm_actions = [ aws_autoscaling_policy.web_policy_up.arn ]
+  dimensions = {
+      AutoScalingGroupName = aws_autoscaling_group.web.name
+    }
+  alarm_description = "This metric monitor EC2 instance CPU utilization"
+    alarm_actions = [ aws_autoscaling_policy.web_policy_up.arn ]
 }
 resource "aws_autoscaling_policy" "web_policy_down" {
   name = "web_policy_down"
@@ -36,11 +36,11 @@ resource "aws_cloudwatch_metric_alarm" "web_cpu_alarm_down" {
   period = "120"
   statistic = "Average"
   threshold = "30"
-dimensions = {
-    AutoScalingGroupName = "aws_autoscaling_group.web.name"
-  }
-alarm_description = "This metric monitor EC2 instance CPU utilization"
-  alarm_actions = [ aws_autoscaling_policy.web_policy_down.arn ]
+  dimensions = {
+      AutoScalingGroupName = "aws_autoscaling_group.web.name"
+    }
+  alarm_description = "This metric monitor EC2 instance CPU utilization"
+    alarm_actions = [ aws_autoscaling_policy.web_policy_down.arn ]
 }
 
 
