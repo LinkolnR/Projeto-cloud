@@ -1,3 +1,23 @@
+variable "db_username" {
+  description = "Usuário da database, coloque seu username no arquivo secrets.tfvars"
+  type        = string
+  sensitive   = true
+}
+
+variable "db_password" {
+  description = "senha da database, coloque seu username no arquivo secrets.tfvars"
+  type        = string
+  sensitive   = true
+}
+
+variable "key_name"{
+  description = "key para utilizar para conexão com instâncias"
+  type        = string 
+  default = "proj_link" # Edite Aqui para o nome da sua chave gerada
+} 
+
+
+
 # Variável para a região da AWS
 variable "aws_region"  {
     default = "us-east-1"
@@ -20,7 +40,6 @@ variable "subnets_publicas" {
      ]
 }
 
-
 variable "subnets_privadas" {
     description = "Definindo as subnets para as instancias"
     type        = list(string)
@@ -32,7 +51,7 @@ variable "subnets_privadas" {
      ]
 }
 
-# variables para autoscaling
+# variáveis para autoscaling
 variable "min_size" {
   description = "Numero minimo de instancias no grupo"
   type        = number
@@ -64,16 +83,3 @@ variable "cpu_alarm_threshold" {
 }
 
 
-variable "db_username" {
-  description = "Database master user"
-  type        = string
-  sensitive   = true
-}
-
-// This variable contains the database master password
-// We will be storing this in a secrets file
-variable "db_password" {
-  description = "Database master user password"
-  type        = string
-  sensitive   = true
-}

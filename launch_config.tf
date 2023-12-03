@@ -2,7 +2,7 @@ resource "aws_launch_template" "web_template" {
     image_id = "ami-0fc5d935ebf8bc3bc"
     instance_type = "t2.micro"
     name_prefix = "template-"
-    key_name = "proj_link"  
+    key_name = var.key_name
     
     network_interfaces {
       security_groups = [aws_security_group.app.id]
